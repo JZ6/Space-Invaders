@@ -1,2 +1,2 @@
-# Space-Invaders-
+# Space Invaders
 Written in Verilog
