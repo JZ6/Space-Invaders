@@ -18,9 +18,9 @@ module player
 	input   [9:0]   SW;
 	input   [3:0]   KEY;
 	
-	wire [7:0] x ;
-	wire [6:0] y ;
-	wire [2:0] color ;
+	wire [7:0] x;
+	wire [6:0] y;
+	wire [2:0] color;
 	
 	wire clock_out;
 	
@@ -33,23 +33,56 @@ module player
 	output	[9:0]	VGA_G;	 				//	VGA Green[9:0]
 	output	[9:0]	VGA_B;   				//	VGA Blue[9:0]
 	
-	XCounter horizon(
-	.clock(CLOCK_50),
+	XCounter right(
+	.clock(KEY[0]),
 	.resetn(SW[0]),
-	.right(KEY[0]), 
-	.left(KEY[3]),
+	.enable(SW[1]), 
+	.increase(1'b1),
 	.x_out(x)
 	);
 	
-	YCounter vert(
-	.clock(CLOCK_50),
+	XCounter left(
+	.clock(KEY[3]),
 	.resetn(SW[0]),
-	.up(KEY[2]), 
-	.down(KEY[3]),
+	.enable(SW[1]), 
+	.increase(1'b0),
+	.x_out(x)
+	);
+	
+	YCounter down(
+	.clock(KEY[2]),
+	.resetn(SW[0]),
+	.enable(SW[1]), 
+	.increase(1'b1),
+	.y_out(y)
+	);
+	
+	YCounter up(
+	.clock(KEY[1]),
+	.resetn(SW[0]),
+	.enable(SW[1]), 
+	.increase(1'b0),
+	.y_out(y)
+	);
+	
+	playerx sizex(
+	.clock(CLOCK_50),
+	.move_enable(KEY[3:0]),
+	.x_out(x)
+	);
+	
+	playery sizey(
+	.clock(CLOCK_50),
+	.move_enable(KEY[3:0]),
+	.y_out(y)
+	);
+	
+	bullet b(
+	.clock(CLOCK_50),
+	.shoot(SW[9]),
 	.y_out(y),
 	.clock_out(clock_out)
 	);
-	
 	
 	eraser e1(
 	.clock(CLOCK_50),
@@ -80,102 +113,117 @@ module player
 		defparam VGA.BACKGROUND_IMAGE = "black.mif";
 endmodule
 
-module XCounter (clock, resetn, right, left, x_out);
+module XCounter (clock, resetn, enable, increase, x_out);
 	input clock; // declare clock
 	input resetn; // declare resetn
-	input right; // enable
-	input left; // increase or not
+	input enable; // enable
+	input increase; // increase or not
 	output [7:0] x_out;
 	
 	reg [7:0] m; // declare m
-	
-	reg [7:0] temp = 8'd80;
-	
 	always @(posedge clock) // triggered every time clock rises
 	begin
-		if (temp == m)
-			m <= m + 1;
-		else if (temp == m - 1'b1)
-			m <= m - 2'b10;
-		else if(temp == m + 1'b1)
-			m <= m + 1;
-		else
-			m <= temp;
-					
 		if (resetn == 1'b0) // when resetn is 0
-			m <= 8'd80; // m is set to 0
-		else if (left ^ right)
+			m <= 0; // m is set to 0
+		else if (enable == 1'b1) // increment m only when enable is 1
 			begin
-				if (right == 1'b0)
-					begin
-						m <= m + 1'b1; // increment m
-						temp <= m;
-					end
+				if (increase == 1'b1)
+					m <= m + 1'b1; // increment m
 				else
-					begin
-						m <= m - 1'b1; 
-						temp <= m;
-					end
+					m <= m - 1'b1; // decrement m
 			end
 	end
-	
 	assign x_out = m;
 endmodule
 
 
-module YCounter (clock, resetn, up, down, y_out,clock_out);
+module YCounter (clock, resetn, enable, increase, y_out);
 	input clock; // declare clock
 	input resetn; // declare resetn
-	output clock_out;
-	input up; // enable
-	input down; // increase or not
+	input enable; // enable
+	input increase; // increase or not
 	output [6:0] y_out;
 	
-	reg [6:0] m = 7'd110; // declare m
-	
-	reg [6:0] temp = 7'd110;
-	
-	
+	reg [6:0] m; // declare m
 	always @(posedge clock) // triggered every time clock rises
 	begin
-		
-		if (temp == m)
-			m <= m + 1;
-		else if(temp == m - 1'b1)
-			m <= m - 1'b1;
-		else
-			m <= temp;
-			
 		if (resetn == 1'b0) // when resetn is 0
 			m <= 7'd60; // m is set to 0
-		else if (up ^ down) 
+		else if (enable == 1'b1) // increment m only when enable is 1
 			begin
-				if (down == 1'b0)
-					begin
-						m <= m + 1'b1; // increment m
-						temp <= m;
-					end
+				if (increase == 1'b1)
+					m <= m + 1'b1; // increment m
 				else
-					begin
-						m <= m - 1'b1; // increment m
-						temp <= m;
-					end
+					m <= m - 1'b1; // decrement m
 			end
 	end
 	assign y_out = m;
 endmodule
 
-module bullet (y_in,clock, shoot, y_out, clock_out);
+module playerx (clock, move_enable, x_out);
+	input clock; // declare clock
+	input [3:0] move_enable;
+	output [7:0] x_out;
+	
+	reg [7:0] m; // declare m
+	
+	reg [7:0] temp;
+	
+	always @(posedge clock) // triggered every time clock rises
+	begin
+		if (move_enable[0] & move_enable[1] & move_enable[2] & move_enable[3])
+			begin
+				if (temp == m)
+					m <= m + 1;
+				else if (temp == m - 1'b1)
+					m <= m - 2'b10;
+				else if(temp == m + 1'b1)
+					m <= m + 1;
+				else
+					m <= temp;
+			end
+		else
+			temp <= m;
+	end
+	assign x_out = m;
+endmodule
+
+
+module playery (clock, move_enable, y_out);
+	input clock; // declare clock
+	input [3:0] move_enable;
+	output [6:0] y_out;
+	
+	reg [6:0] m; // declare m
+	
+	reg [6:0] temp;
+	
+	always @(posedge clock) // triggered every time clock rises
+	begin
+		if (move_enable[0] & move_enable[1] & move_enable[2] & move_enable[3])
+			begin
+				if (temp == m)
+					m <= m + 1;
+				else if(temp == m - 1'b1)
+					m <= m - 1'b1;
+				else
+					m <= temp;
+			end
+		else
+			temp <= m;
+	end
+	assign y_out = m;
+endmodule
+
+module bullet (clock, shoot, y_out, clock_out);
 	input clock; // declare clock
 	input shoot;
-	input [6:0] y_in;
 	
 	output reg clock_out;
 	output [6:0] y_out;
 	
 	reg[23:0] counter;
 	reg [6:0] m; // declare m
-	initial m = y_in[6:0];
 	
 	always @(posedge clock)
 		begin
@@ -197,6 +245,28 @@ module bullet (y_in,clock, shoot, y_out, clock_out);
 				end
 		end
 	assign y_out = m;
+endmodule
+
+module DelayCounter (clock, resetn, enable, delay_out);
+	input clock; // declare clock
+	input resetn; // declare resetn
+	input enable; // declare enable
+	output [19:0] delay_out;
+	
+	reg [19:0] m; // declare m
+	always @(posedge clock) // triggered every time clock rises
+	begin
+		if (resetn == 1'b0) // when reset n is 0
+			m <= 0; // m is set to 0
+		else if (enable == 1'b1) // increment m only when enable is 1
+			begin
+				if (m == 20'd833400)
+					m <= 0; // m reset
+				else // when m is not the minimum value
+				   m <= m + 1'b1; // increase m
+			end
+	end
+	assign delay_out = m;
 endmodule
 
 module eraser(clock,colour_erase_enable, colour, clock_out);
